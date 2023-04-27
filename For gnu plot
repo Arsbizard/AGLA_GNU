@@ -1,0 +1,429 @@
+// Arsenii Belugin
+
+#include <iostream>
+#include <vector>
+#include <iomanip>
+#include <cmath>
+
+using namespace std;
+
+class ColumnVector
+{
+public:
+    vector<double> column_vector;
+    explicit ColumnVector(int n)
+    {
+        vector<double> buffer(n);
+        column_vector = buffer;
+    }
+
+    friend ostream& operator << (ostream& output, const ColumnVector& column);
+    friend istream& operator >> (istream& input, ColumnVector& column);
+};
+
+class Matrix
+{
+public:
+    int rows, columns;
+    vector<vector<double>> full_matrix;
+
+    friend ostream& operator << (ostream& output, const Matrix& matrix);
+    friend istream& operator >> (istream& input, Matrix& matrix);
+
+    Matrix(int n, int m)
+    {
+        rows = n;
+        columns = m;
+        vector<vector<double>> buffer(n, vector<double>(m));
+        full_matrix = buffer;
+    }
+
+    virtual Matrix& operator = (Matrix const& matrix2)
+    {
+        rows = matrix2.rows;
+        columns = matrix2.columns;
+        for (int i = 0; i < rows; i++)
+        {
+            for (int j = 0; j < columns; j++)
+            {
+                full_matrix[i][j] = matrix2.full_matrix[i][j];
+            }
+        }
+        return *this;
+    }
+
+    Matrix operator + (Matrix const &matrix2)
+    {
+        vector<vector<int>> empty(matrix2.rows, vector<int>(this->columns));
+        Matrix emptyMatrix(0, 0);
+        if (matrix2.rows != this->rows or matrix2.columns != this->columns)
+        {
+            cout << "Error: the dimensional problem occurred" << endl;
+            return emptyMatrix;
+        }
+        else
+        {
+            Matrix answer(this->rows, matrix2.columns);
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < columns; j++)
+                {
+                    answer.full_matrix[i][j] = this->full_matrix[i][j] + matrix2.full_matrix[i][j];
+                }
+            }
+            return answer;
+        }
+    }
+
+    Matrix operator - (Matrix const &matrix2)
+    {
+        vector<vector<int>> empty(matrix2.rows, vector<int>(this->columns));
+        Matrix emptyMatrix(0, 0);
+        if (matrix2.rows != this->rows or matrix2.columns != this->columns)
+        {
+            cout << "Error: the dimensional problem occurred" << endl;
+            return emptyMatrix;
+        }
+        else
+        {
+            Matrix answer(this->rows, matrix2.columns);
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < columns; j++)
+                {
+                    answer.full_matrix[i][j] = this->full_matrix[i][j] - matrix2.full_matrix[i][j];
+                }
+            }
+            return answer;
+        }
+    }
+
+    Matrix operator * (Matrix const &matrix2)
+    {
+        vector<vector<int>> empty(this->rows, vector<int>(matrix2.columns));
+        Matrix emptyMatrix(0, 0);
+        Matrix answer(this->rows, matrix2.columns);
+        if (matrix2.rows != this->columns)
+        {
+            cout << "Error: the dimensional problem occurred" << endl;
+            return emptyMatrix;
+        }
+        else
+        {
+            for (int i = 0; i < this->rows; i++)
+            {
+                for (int j = 0; j < matrix2.columns; j++)
+                {
+                    for (int h = 0; h < this->columns; h++)
+                    {
+                        answer.full_matrix[i][j] += this->full_matrix[i][h] * matrix2.full_matrix[h][j];
+                    }
+                }
+            }
+            return answer;
+        }
+    }
+
+    Matrix operator * (ColumnVector const &matrix2)
+    {
+        vector<vector<int>> empty(this->rows, vector<int>(1));
+        Matrix emptyMatrix(0, 0);
+        Matrix answer(this->rows, 1);
+        if (matrix2.column_vector.size() != this->columns)
+        {
+            cout << "Error: the dimensional problem occurred" << endl;
+            return emptyMatrix;
+        }
+        else
+        {
+            for (int i = 0; i < this->rows; i++)
+            {
+                for (int h = 0; h < this->columns; h++)
+                {
+                    answer.full_matrix[i][0] += this->full_matrix[i][h] * matrix2.column_vector[h];
+                }
+            }
+            return answer;
+        }
+    }
+
+    Matrix transpose()
+    {
+        vector<vector<int>> empty(this->columns, vector<int>(this->rows));
+        Matrix answer(this->columns, this->rows);
+        answer.rows = columns;
+        answer.columns = rows;
+        for (int i = 0; i < this->columns; i++)
+        {
+            for (int j = 0; j < this->rows; j++)
+            {
+                answer.full_matrix[i][j] = this->full_matrix[j][i];
+            }
+        }
+        return answer;
+    }
+
+    void direct_elimination(Matrix &answer);
+
+    void backward_elimination(Matrix &answer);
+
+    Matrix compute_inverse();
+
+    void diagonal_normalization(Matrix &answer);
+};
+
+ostream &operator<<(ostream &output, const ColumnVector &column)
+{
+    for (double i : column.column_vector)
+    {
+        if (round(i * 10000.0) / 10000.0 == -0)
+        {
+            output << fixed << setprecision(4) << 0.0000 << endl;
+        }
+        else
+        {
+            output << fixed << setprecision(4) << i << endl;
+        }
+    }
+    return output;
+}
+
+istream &operator>>(istream &input, ColumnVector &column)
+{
+    for (double & i : column.column_vector)
+    {
+        input >> i;
+    }
+    return input;
+}
+
+ostream &operator << (ostream &output, const Matrix &matrix)
+{
+    for (int i = 0; i < matrix.rows; i++)
+    {
+        for (int j = 0; j < matrix.columns; j++)
+        {
+            if (round(matrix.full_matrix[i][j] * 10000.0) / 10000.0 == -0)
+            {
+                output << fixed << setprecision(4) << 0.0000 << " ";
+            }
+            else
+            {
+                output << fixed << setprecision(4) << matrix.full_matrix[i][j] << " ";
+            }
+        }
+        output << endl;
+    }
+    return output;
+}
+
+istream &operator >> (istream &input, Matrix &matrix)
+{
+    for (int i = 0; i < matrix.rows; i++)
+    {
+        for (int j = 0; j < matrix.columns; j++)
+        {
+            input >> matrix.full_matrix[i][j];
+        }
+    }
+    return input;
+}
+
+class squareMatrix: public Matrix
+{
+public:
+    squareMatrix(int n1, int m1): Matrix(n1, m1)
+    {
+        rows = n1;
+        columns = m1;
+        vector<vector<double>> buffer(n1, vector<double>(m1));
+        full_matrix = buffer;
+    }
+
+    squareMatrix& operator = (Matrix const& matrix2) override
+    {
+        rows = matrix2.rows;
+        columns = matrix2.columns;
+        for (int i = 0; i < rows; i++)
+        {
+            for (int j = 0; j < columns; j++)
+            {
+                full_matrix[i][j] = matrix2.full_matrix[i][j];
+            }
+        }
+        return *this;
+    }
+};
+
+class IdentityMatrix : public squareMatrix
+{
+public:
+    explicit IdentityMatrix(int size) : squareMatrix(size, size)
+    {
+        for (int i = 0; i < size; i++)
+        {
+            full_matrix[i][i] = 1;
+        }
+    }
+};
+
+class EliminationMatrix : public IdentityMatrix
+{
+public:
+    EliminationMatrix(int n1, int i, int j, Matrix &A) : IdentityMatrix(n1)
+    {
+        double factor;
+        factor = A.full_matrix[i][j] / A.full_matrix[j][j];
+        full_matrix[i][j] = -factor;
+    }
+};
+
+class PermutationMatrix : public IdentityMatrix
+{
+public:
+    PermutationMatrix(int n1, int i, int j) : IdentityMatrix(n1)
+    {
+        vector<double> buffer = full_matrix[i];
+        full_matrix[i] = full_matrix[j];
+        full_matrix[j] = buffer;
+    }
+};
+
+void Matrix::diagonal_normalization(Matrix &answer)
+{
+    for (int k = 0; k < rows; k++)
+    {
+        double factor = this->full_matrix[k][k];
+        for (int j = 0; j < rows; j++)
+        {
+            this->full_matrix[k][j] /= factor;
+            answer.full_matrix[k][j] /= factor;
+        }
+    }
+}
+
+void Matrix::direct_elimination(Matrix &answer)
+{
+    for (int i = 0; i < rows; i++)
+    {
+        int max_row = i;
+        for (int j = i + 1; j < rows; j++)
+        {
+            if (abs(this->full_matrix[j][i]) > abs(this->full_matrix[max_row][i]))
+            {
+                max_row = j;
+            }
+        }
+        if (max_row != i)
+        {
+            PermutationMatrix permutation(rows, i, max_row);
+            *this = permutation * *this;
+            answer = permutation * answer;
+        }
+        for (int j = i + 1; j < rows; j++)
+        {
+            if (this->full_matrix[j][i] != 0)
+            {
+                EliminationMatrix elimination(rows, j, i, *this);
+                *this = elimination * *this;
+                answer = elimination * answer;
+                this->full_matrix[j][i] = 0.0;
+            }
+        }
+    }
+}
+
+void Matrix::backward_elimination(Matrix &answer)
+{
+    for (int k = rows - 1; k > 0; k--)
+    {
+        for (int i = k - 1; i >= 0; i--)
+        {
+            EliminationMatrix elimination(rows, i, k, *this);
+            *this = elimination * *this;
+            answer = elimination * answer;
+        }
+    }
+}
+
+Matrix Matrix::compute_inverse()
+{
+    IdentityMatrix answer_(this->rows);
+    Matrix answer = answer_;
+    direct_elimination(answer);
+    backward_elimination(answer);
+    diagonal_normalization(answer);
+    return answer;
+}
+
+int main()
+{
+    FILE* op = _popen("C:\\gnuplot\\bin\\gnuplot -persist", "w");
+
+    int n, degree;
+    double buffer;
+    cin >> n;
+
+    vector<double> x(n);
+    vector<double> v(n);
+    ColumnVector t(n), b(n);
+
+    for(int i = 0; i < n; i++)
+    {
+        cin >> x[i];
+        cin >> v[i];
+    }
+
+    for (int i = 0; i < n; i++)
+    {
+        cin >> buffer;
+        t.column_vector[i] = buffer;
+
+        cin >> buffer;
+        b.column_vector[i] = buffer;
+    }
+
+    cin >> degree;
+    Matrix A_T(degree + 1, n);
+    Matrix A(n, degree + 1);
+
+    for (int i = 0; i < degree + 1; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            A_T.full_matrix[i][j] = pow(t.column_vector[j], i);
+        }
+    }
+
+    A = A_T.transpose();
+
+    cout << "A:" << endl << A;
+
+    cout << "A_T*A:" << endl << A_T * A;
+
+    Matrix new_A = A_T * A;
+    new_A = new_A.compute_inverse();
+
+    cout << "(A_T*A)^-1:" << endl << new_A;
+
+    Matrix new_b = A_T * b;
+
+    cout << "A_T*b:" << endl << new_b;
+
+    ColumnVector X = new_A * new_b;
+
+    cout << "x~:" << endl << X;
+
+    fprintf(op, "plot [-7 : 10] [-100 : 10] f(x) = %lf*x**3 + %lf*x**2 + %lf*x**1 + %lf*x**0, f(x) title 'f(x)', '-' using 1:1 title 'point' with points\n", 
+                                                                                        X.column_vector[0], X.column_vector[1], X.column_vector[2], X.column_vector[3]);
+
+    fflush(op);
+
+    for(int i = 0; i < n; i++)
+    {
+        cout << x[i] << " " << v[i] << endl;
+        fprintf(op, "%lf\t%lf\n", x[i], v[i]);
+    }
+
+    return 0;
+}
